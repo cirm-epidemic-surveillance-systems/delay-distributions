@@ -73,7 +73,7 @@ ggplot(summary_sim_df)+
   coord_cartesian(xlim = c(0, 15)) +
   xlab('Time since infection') +
   ylab('Infectiousness profile') +
-  ggtitle(glue("Empirical GI from {n_infectors} infectors"))
+  ggtitle(glue("Empirical GI from both methods"))
 
 # Distribution of number of contacts across individual-days
 ggplot(sim_df) + 
@@ -96,6 +96,8 @@ for( j in 1:nrow(sim_df_filtered)){
 # Eventually replace with the primary censored dist implementation, but for now
 # leave as is
 fit_lnorm <- fitdist(generation_intervals, "lnorm")
+boot_fit <- bootdist(fit_lnorm, niter = 100)
+boot_fit$estim
 
 # Extract parameter estimates from fit to generation times
 meanlog_estimate <- fit_lnorm$estimate["meanlog"]
@@ -147,7 +149,7 @@ model_file_path <- file.path("inst", "stan", "binomial_obs_model.stan")
 model <- cmdstan_model(model_file_path)
 model$compile()
 
-# Fit the model
+# Fit the model using contacts
 fit_binomial<- model$sample(
   data = stan_data
 )
@@ -155,8 +157,7 @@ fit_binomial<- model$sample(
 all_draws <- fit_binomial$draws()
 logmean_estimate_binomial<- all_draws|>
   spread_draws(logmean_gi) |>
-  mutate(draw = `.draw`) |>
-  mutate(
+  mutate(draw = `.draw`,
     name = "logmean_gi",
   ) |>
   rename(value = logmean_gi) 
@@ -164,6 +165,13 @@ ggplot(logmean_estimate_binomial) +
   aes(x = value) +
   stat_halfeye() +
   xlab("Estimated logmean from positive contacts")
+
+logsd_estimate_binomial <- all_draws |>
+  spread_draws(logsd_gi) |>
+  mutate(draw = `.draw`,
+         name = "logsd_gi"
+  ) |>
+  rename(value = logsd_gi)
 
 gi_binomial<- all_draws|>
   spread_draws(gi[tau]) |>
@@ -177,6 +185,60 @@ ggplot(gi_binomial)+
   geom_line(aes(x = tau, y = value, group = draw), alpha = 0.1) +
   xlab("Estimated GI from positive contacts")
 
+for(i in 1:100){
+  sample_i <- sample(1:max(logmean_estimate_binomial$draw), 1)
+  draw_logmean_bin <- logmean_estimate_binomial$value[logmean_estimate_binomial$draw == sample_i]
+  draw_logsd_bin <- logsd_estimate_binomial$value[logsd_estimate_binomial$draw == sample_i]
+  draw_logmean_std <- boot_fit$estim[i,1]
+  draw_logsd_std <- boot_fit$estim[i,2]
+  gi_binomial <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
+                        meanlog = draw_logmean_bin,
+                        sdlog = draw_logsd_bin)
+  gi_transmission_times <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
+                        meanlog = draw_logmean_std,
+                        sdlog = draw_logsd_std)
+  gi_ground_truth <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
+                            meanlog = convert_to_logmean(mean_gi, sigma_gi),
+                            sdlog= convert_to_logsd(mean_gi, sigma_gi))
+  df_i <- data.frame(gi_from_all_contacts = gi_binomial,  
+                     gi_transmission_times = gi_transmission_times, 
+                     sample = i,
+                     tau = seq(from = 1, to = 28, by = 0.1))
+  if(i ==1){
+    df_gi <- df_i
+  }else{
+    df_gi <- bind_rows(df_gi, df_i)
+  }
+}
+
+df_gt <- data.frame( tau = seq(from = 1, to = 28, by = 0.1),
+                     gi_ground_truth = dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
+                                              meanlog = convert_to_logmean(mean_gi, sigma_gi),
+                                              sdlog= convert_to_logsd(mean_gi, sigma_gi)))
+
+df_gi_long <- df_gi |>
+  pivot_longer(cols = starts_with("gi_"),
+               names_prefix = "gi_",
+               names_to = "gi_type",
+               values_to = "gi_estimate")
+
+ggplot() + 
+  geom_line(data = df_gi_long |> filter(gi_type == "transmission_times"),
+            aes(x = tau, y = gi_estimate, group = sample),
+            color = "darkblue",
+            alpha = 0.1) + 
+  geom_line(data = df_gi_long |> filter(gi_type == "from_all_contacts"),
+            aes(x = tau, y = gi_estimate, group = sample),
+            color = "red4",
+            alpha = 0.1) + 
+  geom_line(data = df_gt,
+            aes(x = tau, y = gi_ground_truth), color = "black") +
+  theme_bw() +
+  xlab("Time since infection") +
+  ylab("Generation interval estimate")+
+  ggtitle("Comparing estimates from different data sources ") +
+  theme(legend.position = "bottom")
+  
 
 
 
