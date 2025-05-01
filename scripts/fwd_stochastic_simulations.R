@@ -55,6 +55,6 @@ for(i in 1:n_infectors){
 
 # Make some plots from the simulated data 
 
-ggplot
+
 
 
