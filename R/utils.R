@@ -34,3 +34,16 @@ convert_to_logsd <- function(mean, sd) {
   logsd <- sqrt(log(1 + (sd^2 / mean^2)))
   return(logsd)
 }
+
+to_simplex <- function(x) {
+  # Handle non-positive values (optional)
+  x[x < 0] <- 0
+  
+  # If all values are 0, return equal proportions
+  if(sum(x) == 0) {
+    return(rep(1/length(x), length(x)))
+  }
+  
+  # Normalize to sum to 1
+  x / sum(x)
+}
