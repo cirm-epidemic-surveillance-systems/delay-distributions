@@ -39,6 +39,7 @@ simulate_infector_data <- function(alpha_mean = 0.2, # scale factor on GI
       n_contacts_tau = C_i_tau,
       tau = 1:max_gi,
       n_pos_contacts_tau = N_i_tau,
+      gi = gi,
       # keep the individuals and population metadata 
       ind_mean_num_contacts_ind = C_i,
       pop_mean_num_contacts = C_mean,

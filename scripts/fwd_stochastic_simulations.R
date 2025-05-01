@@ -20,6 +20,9 @@ phi_ind_C <- 2
 vary_ind_contact_rate <- FALSE
 phi_C <- 0.1 # dispersion in daily contacts 
 n_infectors <- 100
+gi <- dlnorm(x = 1:max_gi, 
+             meanlog = convert_to_logmean(mean_gi, sigma_gi), 
+             sdlog = convert_to_logsd(mean_gi, sigma_gi))
 #R0 = \sum_{\tau = 1}^{max_gi}C_mean*GI(\tau)*alpha_mean = C_mean*alpha_mean
 
 # Eventually we will want to do a sensitivity analyses where we vary 
@@ -29,7 +32,7 @@ n_infectors <- 100
 sim_df <- simulate_infector_data(max_gi = max_gi,
                                  mean_gi = mean_gi,
                                  alpha_mean = alpha_mean,
-                                 vary_ind_infectiousness = vary_inf_infectiousness,
+                                 vary_ind_infectiousness = vary_ind_infectiousness,
                                  phi_alpha = phi_alpha,
                                  R0 = R0,
                                  phi_ind_C = phi_ind_C,
