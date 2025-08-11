@@ -18,7 +18,7 @@ alpha_mean <- 0.2 # scale factor on GI
 vary_ind_infectiousness <- FALSE
 phi_alpha <- 0.1
 R0 <- 2
-C_mean <- R0/alpha_mean # Mean number of contacts per
+C_mean <- R0/alpha_mean # Mean number of contacts per day (starting at 10)
 phi_ind_C <- 2
 vary_ind_contact_rate <- FALSE
 phi_C <- 0.1 # dispersion in daily contacts 
