@@ -1,10 +1,11 @@
-# This script will be used to define the parameters we would like to create the 
-# number of contacts as a function of time since infection (\tau) and the number
-# of positive contacts as a function of time since infection
+# This script will be used to generate data from a simulated outbreak to 
+# generate fake simulated transmission pairs/contact-tracing data, then fit it
+# to each of the two models (one which uses the positive and negative contacts 
+# via a binomial observation model and one which uses a poisson observation 
+# model on only the test positive contacts 
 library(ggplot2)
 library(glue)
 library(dplyr)
-library(fitdistrplus)
 library(cmdstanr)
 library(tidybayes)
 
@@ -82,8 +83,9 @@ ggplot(sim_df) +
   xlab("Number of contacts per day") +
   ylab("Frequency") 
 
-# Estimate the GI in two ways using a MLE estimate of a parametric fit to a 
-# lognormal 
+# Estimate the GI in two ways: 
+# 1. Using a binomial observation model with both test positive and negative contact
+# 2. Using a poisson observation model using only test positive contacts
 
 generation_intervals <- c()
 sim_df_filtered <- sim_df[sim_df$n_pos_contacts_tau>0, ]
@@ -122,6 +124,9 @@ ggplot(df_gi_estimates) +
   xlab("Time since infection") +
   ylab("discrete GI")
 
+# Obtain a matrix where rows are infectors and columns are days since infection,
+# entries are the number of contacts that infector had on that day 
+# since infection. 
 C0<- sim_df |>
   pivot_wider(id_cols = infector_id,
               names_from = tau,
@@ -129,6 +134,8 @@ C0<- sim_df |>
               values_from = n_contacts_tau)|> as.matrix() 
 C <- C0[, 2:(max_gi+1)]
 
+# Matrix of the number of positives, rows are infectors, colummns are 
+# days since infection. 
 NI0 <-sim_df |>
   pivot_wider(id_cols = infector_id,
               names_from = tau,
@@ -136,8 +143,10 @@ NI0 <-sim_df |>
               values_from = n_pos_contacts_tau)|> as.matrix() 
 NI <- NI0[, 2:(max_gi+1)]
 
-# A very simple example of fitting a binomial regression in stan
-stan_data <- list(
+## Fit binomial observation model to full data ------------------------------
+# A very simple example of fitting the binomial observation model using both
+# contacts and positives in stan. 
+stan_data_bin <- list(
   N_infectors = n_infectors,
   max_gi = max_gi,
   C = C,
@@ -151,7 +160,7 @@ model$compile()
 
 # Fit the model using contacts
 fit_binomial<- model$sample(
-  data = stan_data
+  data = stan_data_bin
 )
 
 all_draws <- fit_binomial$draws()
@@ -184,6 +193,10 @@ gi_binomial<- all_draws|>
 ggplot(gi_binomial)+
   geom_line(aes(x = tau, y = value, group = draw), alpha = 0.1) +
   xlab("Estimated GI from positive contacts")
+
+## Fit the poisson observation model to a log normal using only test positive
+# contacts
+
 
 for(i in 1:100){
   sample_i <- sample(1:max(logmean_estimate_binomial$draw), 1)
