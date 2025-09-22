@@ -1,5 +1,5 @@
 functions{
-  /**
+/**
   * Calculate lognormal density at a vector of indices
   *
   * @param x Vector of values at which to calculate the density
