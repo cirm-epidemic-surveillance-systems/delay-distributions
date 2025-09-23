@@ -58,6 +58,7 @@ obs_data %>% ungroup %>% select(infector_id, d) %>% distinct() %>%
   xlab("Number days since infection") +
   ylab("Frequency") +
   theme_bw()
+ggsave("figures/days_to_detection.png")
 
 # Probability of being a recalled contact
 data.frame(p = 1-sigmoid(-5+1:28), days = 1:28) %>% 
@@ -66,6 +67,7 @@ data.frame(p = 1-sigmoid(-5+1:28), days = 1:28) %>%
   xlab("Number days before detection") +
   ylab("Probability of being a recalled contact")+
   theme_bw()
+ggsave("figures/p_recalled_contact.png")
 
 
 # Make some plots from the observation data 
@@ -73,8 +75,9 @@ ggplot(obs_data) +
   geom_line(aes(x = tau, y = rep_n_pos_contacts_tau, color = as.factor(infector_id), 
                 group = as.factor(infector_id)), 
             show.legend = FALSE) +
-  xlab('Time since infection') + ylab('Number of infected reported contacts') +
+  xlab('Time since infection') + ylab('Reported number of infected contacts') +
   theme_bw() + coord_cartesian(xlim = c(0, 15))
+ggsave("figures/time_rep_infection.png")
 
 
 # Distribution of number reported recalled contacts across individual-days
@@ -82,4 +85,4 @@ ggplot(obs_data) +
   geom_histogram(aes(x = rep_n_contacts_tau)) +
   theme_bw() +
   xlab("Number of recalled reported contacts per day") +
-  ylab("Frequency") 
+  ylab("Number") 
