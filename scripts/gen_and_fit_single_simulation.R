@@ -1,10 +1,11 @@
-# This script will be used to define the parameters we would like to create the 
-# number of contacts as a function of time since infection (\tau) and the number
-# of positive contacts as a function of time since infection
+# This script will be used to generate data from a simulated outbreak to 
+# generate fake simulated transmission pairs/contact-tracing data, then fit it
+# to each of the two models (one which uses the positive and negative contacts 
+# via a binomial observation model and one which uses a poisson observation 
+# model on only the test positive contacts 
 library(ggplot2)
 library(glue)
 library(dplyr)
-library(fitdistrplus)
 library(cmdstanr)
 library(tidybayes)
 
@@ -82,46 +83,13 @@ ggplot(sim_df) +
   xlab("Number of contacts per day") +
   ylab("Frequency") 
 
-# Estimate the GI in two ways using a MLE estimate of a parametric fit to a 
-# lognormal 
+# Estimate the GI in two ways: 
+# 1. Using a binomial observation model with both test positive and negative contact
+# 2. Using a poisson observation model using only test positive contacts
 
-generation_intervals <- c()
-sim_df_filtered <- sim_df[sim_df$n_pos_contacts_tau>0, ]
-for( j in 1:nrow(sim_df_filtered)){
-  generation_intervals <- c(generation_intervals, 
-                            rep(sim_df_filtered$tau[j],
-                                sim_df_filtered$n_pos_contacts_tau[j]))
-}
-
-# Eventually replace with the primary censored dist implementation, but for now
-# leave as is
-fit_lnorm <- fitdist(generation_intervals, "lnorm")
-boot_fit <- bootdist(fit_lnorm, niter = 100)
-boot_fit$estim
-
-# Extract parameter estimates from fit to generation times
-meanlog_estimate <- fit_lnorm$estimate["meanlog"]
-sdlog_estimate <- fit_lnorm$estimate["sdlog"]
-
-df_gi_estimates <-data.frame(
-  tau = 1:max_gi,
-  gi_ground_truth = gi,
-  gi_trad = dlnorm(1:max_gi,
-                   meanlog = meanlog_estimate,
-                   sdlog = sdlog_estimate)
-)|> pivot_longer(cols = starts_with("gi"),
-                 values_to = "gi_value",
-                 names_to = "estimation_type")
-
-print(glue("True meanlog = {meanlog}, estimated meanlog = {meanlog_estimate}"))
-print(glue("True sdlog = {sdlog}, estimated meanlog = {sdlog_estimate}"))
-
-ggplot(df_gi_estimates) +
-  geom_line(aes(x = tau, y = gi_value, color = estimation_type)) +
-  theme_bw() +
-  xlab("Time since infection") +
-  ylab("discrete GI")
-
+# Obtain a matrix where rows are infectors and columns are days since infection,
+# entries are the number of contacts that infector had on that day 
+# since infection. 
 C0<- sim_df |>
   pivot_wider(id_cols = infector_id,
               names_from = tau,
@@ -129,6 +97,8 @@ C0<- sim_df |>
               values_from = n_contacts_tau)|> as.matrix() 
 C <- C0[, 2:(max_gi+1)]
 
+# Matrix of the number of positives, rows are infectors, colummns are 
+# days since infection. 
 NI0 <-sim_df |>
   pivot_wider(id_cols = infector_id,
               names_from = tau,
@@ -136,8 +106,10 @@ NI0 <-sim_df |>
               values_from = n_pos_contacts_tau)|> as.matrix() 
 NI <- NI0[, 2:(max_gi+1)]
 
-# A very simple example of fitting a binomial regression in stan
-stan_data <- list(
+## Fit binomial observation model to full data ------------------------------
+# A very simple example of fitting the binomial observation model using both
+# contacts and positives in stan. 
+stan_data_bin <- list(
   N_infectors = n_infectors,
   max_gi = max_gi,
   C = C,
@@ -146,12 +118,14 @@ stan_data <- list(
 )
 
 model_file_path <- file.path("inst", "stan", "binomial_obs_model.stan")
-model <- cmdstan_model(model_file_path)
+model <- cmdstan_model(model_file_path,
+                       include_paths = file.path("inst", "stan"),
+                       compile = TRUE)
 model$compile()
 
 # Fit the model using contacts
 fit_binomial<- model$sample(
-  data = stan_data
+  data = stan_data_bin
 )
 
 all_draws <- fit_binomial$draws()
@@ -183,20 +157,75 @@ gi_binomial<- all_draws|>
   rename(value = gi) 
 ggplot(gi_binomial)+
   geom_line(aes(x = tau, y = value, group = draw), alpha = 0.1) +
-  xlab("Estimated GI from positive contacts")
+  xlab("Estimated GI from positive and negative contacts")
+
+## Fit the lognormal model with only transmission times --------------------
+transmission_times <- c()
+sim_df_filtered <- sim_df[sim_df$n_pos_contacts_tau>0, ]
+for( j in 1:nrow(sim_df_filtered)){
+  transmission_times <- c(transmission_times, 
+                            rep(sim_df_filtered$tau[j],
+                                sim_df_filtered$n_pos_contacts_tau[j]))
+}
+hist(transmission_times)
+
+stan_data_tt <- list(
+  N = length(transmission_times),
+  transmission_times = transmission_times,
+  max_gi = max_gi,
+  tau_vec = 1:max_gi
+)
+
+model_file_path <- file.path("inst", "stan", "transmission_times_only.stan")
+model <- cmdstan_model(model_file_path)
+model$compile()
+
+# Fit the model using contacts
+fit_tt<- model$sample(
+  data = stan_data_tt
+)
+
+all_draws <- fit_tt$draws()
+logmean_estimate_tt<- all_draws|>
+  spread_draws(logmean_gi) |>
+  mutate(draw = `.draw`,
+         name = "logmean_gi",
+  ) |>
+  rename(value = logmean_gi) 
+
+logsd_estimate_tt <- all_draws |>
+  spread_draws(logsd_gi) |>
+  mutate(draw = `.draw`,
+         name = "logsd_gi"
+  ) |>
+  rename(value = logsd_gi)
+
+gi_tt<- all_draws|>
+  spread_draws(gi[tau]) |>
+  sample_draws(ndraws = 100) |>
+  mutate(draw = `.draw`) |>
+  mutate(
+    name = "gi",
+  ) |>
+  rename(value = gi) 
+ggplot(gi_tt)+
+  geom_line(aes(x = tau, y = value, group = draw), alpha = 0.1) +
+  xlab("Estimated GI from transmission times only")
 
 for(i in 1:100){
   sample_i <- sample(1:max(logmean_estimate_binomial$draw), 1)
   draw_logmean_bin <- logmean_estimate_binomial$value[logmean_estimate_binomial$draw == sample_i]
   draw_logsd_bin <- logsd_estimate_binomial$value[logsd_estimate_binomial$draw == sample_i]
-  draw_logmean_std <- boot_fit$estim[i,1]
-  draw_logsd_std <- boot_fit$estim[i,2]
+  draw_logmean_tt <- logmean_estimate_tt$value[logmean_estimate_tt$draw == sample_i]
+  draw_logsd_tt <- logsd_estimate_tt$value[logsd_estimate_tt$draw == sample_i]
+  # draw_logmean_std <- boot_fit$estim[i,1]
+  # draw_logsd_std <- boot_fit$estim[i,2]
   gi_binomial <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
                         meanlog = draw_logmean_bin,
                         sdlog = draw_logsd_bin)
   gi_transmission_times <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
-                        meanlog = draw_logmean_std,
-                        sdlog = draw_logsd_std)
+                        meanlog = draw_logmean_tt,
+                        sdlog = draw_logsd_tt)
   gi_ground_truth <- dlnorm(x = seq(from = 1, to = max_gi, by = 0.1),
                             meanlog = convert_to_logmean(mean_gi, sigma_gi),
                             sdlog= convert_to_logsd(mean_gi, sigma_gi))

@@ -2,4 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+
+.DS_Store
+
+inst/stan/transmission_times_only
+inst/stan/binomial_obs_model
 *.exe
+
