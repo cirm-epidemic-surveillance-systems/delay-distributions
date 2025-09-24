@@ -1,0 +1,131 @@
+# This script will be used to run the stan model for various parameter settings
+library(ggplot2)
+library(glue)
+library(dplyr)
+library(fitdistrplus)
+library(cmdstanr)
+library(tidybayes)
+library(tidyverse)
+library(patchwork)
+
+list.files(file.path("R"), full.names = TRUE) |>
+  walk(source)
+
+# Compile stan model
+model_file_path <- file.path("inst", "stan", "binomial_obs_model.stan")
+model <- cmdstan_model(model_file_path)
+model$compile()
+
+# Set parameter values
+max_gi <- 28
+mean_gi <- 5
+sigma_gi <- 2
+#alpha_mean <- 0.2 # scale factor on GI
+vary_ind_infectiousness <- FALSE
+phi_alpha <- 0.1
+R0 <- 2
+#C_mean <- R0/alpha_mean # Mean number of contacts per day (starting at 10)
+phi_ind_C <- 2
+vary_ind_contact_rate <- FALSE
+phi_C <- 0.1 # dispersion in daily contacts 
+n_infectors <- 100
+
+gi <- dlnorm(x = 1:max_gi, 
+             meanlog = convert_to_logmean(mean_gi, sigma_gi), 
+             sdlog = convert_to_logsd(mean_gi, sigma_gi))
+meanlog <- convert_to_logmean(mean_gi, sigma_gi)
+sdlog <- convert_to_logsd(mean_gi, sigma_gi)
+#R0 = \sum_{\tau = 1}^{max_gi}C_mean*GI(\tau)*alpha_mean = C_mean*alpha_mean
+
+# Eventually we will want to do a sensitivity analyses where we vary 
+# some of these variables and look at the empirical estimates that 
+# result and the inferred estimates we get from applying observation process 
+# degradation
+run_stan_model <- function(n_infectors, alpha_mean){
+  #C_meam = R0/alpha_mean
+  sim_df <- simulate_infector_data(max_gi = max_gi,
+                                   mean_gi = mean_gi,
+                                   alpha_mean = alpha_mean,
+                                   vary_ind_infectiousness = vary_ind_infectiousness,
+                                   phi_alpha = phi_alpha,
+                                   R0 = R0,
+                                   phi_ind_C = phi_ind_C,
+                                   vary_ind_contact_rate = vary_ind_contact_rate,
+                                   phi_C = phi_C,
+                                   n_infectors = n_infectors)
+  
+  
+  C0<- sim_df |>
+    pivot_wider(id_cols = infector_id,
+                names_from = tau,
+                names_prefix = "tau_",
+                values_from = n_contacts_tau)|> as.matrix() 
+  C <- C0[, 2:(max_gi+1)]
+  
+  NI0 <-sim_df |>
+    pivot_wider(id_cols = infector_id,
+                names_from = tau,
+                names_prefix = "tau_",
+                values_from = n_pos_contacts_tau)|> as.matrix() 
+  NI <- NI0[, 2:(max_gi+1)]
+  
+  # A very simple example of fitting a binomial regression in stan
+  stan_data <- list(
+    N_infectors = n_infectors,
+    max_gi = max_gi,
+    C = C,
+    N = NI,
+    tau_vec = 1:max_gi
+  )
+  
+  
+  # Fit the model using contacts
+  fit_binomial<- model$sample(
+    data = stan_data
+  )
+  
+  all_draws <- fit_binomial$draws()
+  logmean_estimate_binomial<- all_draws|>
+    spread_draws(logmean_gi) |>
+    mutate(draw = `.draw`,
+           name = "logmean_gi",
+    ) |>
+    rename(value = logmean_gi) 
+  
+  
+  logsd_estimate_binomial <- all_draws |>
+    spread_draws(logsd_gi) |>
+    mutate(draw = `.draw`,
+           name = "logsd_gi"
+    ) |>
+    rename(value = logsd_gi)
+  
+  return(list(sim_df = sim_df, 
+              logmean_estimate_binomial = logmean_estimate_binomial, 
+              logsd_estimate_binomial = logsd_estimate_binomial, 
+              logmean_median = fit_binomial$summary("logmean_gi")$median,
+              logsd_median = fit_binomial$summary("logsd_gi")$median))
+}
+
+n_infectors <- c(100, 50, 25, 5)
+alpha_mean <- c(0.1, 0.2, 0.4) # Mean number of contacts per person/day (20, 10, 5)
+res <- data.frame(n_infectors = NA, alpha_mean = NA, logmean_median = NA, logsd_median = NA)
+k <- 0 
+for(i in 1:length(n_infectors)){
+  for(j in 1:length(alpha_mean)){
+    k <- k + 1
+    mod <- run_stan_model(n_infectors = n_infectors[i], alpha_mean = alpha_mean[j])
+    res[k, ] <- c(n_infectors[i], alpha_mean[j], mod$logmean_median, mod$logsd_median)
+  }
+}
+
+res %>% mutate(true_logmean = meanlog, truelodsd = sdlog) %>% saveRDS("results/res_tbl")
+
+
+
+
+
+
+
+
+
