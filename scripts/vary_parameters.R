@@ -119,13 +119,12 @@ for(i in 1:length(n_infectors)){
   }
 }
 
-res %>% mutate(true_logmean = meanlog, truelodsd = sdlog) %>% saveRDS("results/res_tbl")
+
+results <- res |> mutate(true_logmean = meanlog, truelodsd = sdlog) 
 
 
 
-
-
-
+write.csv(results, file.path("results", "results_all_contacts.csv"))
 
 
 
