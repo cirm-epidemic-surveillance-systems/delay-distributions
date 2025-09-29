@@ -18,17 +18,10 @@ model$compile()
 
 # Set parameter values
 max_gi <- 28
-#mean_gi <- 5
 sigma_gi <- 2
-#alpha_mean <- 0.2 # scale factor on GI
 vary_ind_infectiousness <- FALSE
 phi_alpha <- 0.1
-#R0 <- 2
-#C_mean <- R0/alpha_mean # Mean number of contacts per day (starting at 10)
-#phi_ind_C <- 2
 vary_ind_contact_rate <- FALSE
-#phi_C <- 0.1 # dispersion in daily contacts 
-#n_infectors <- 100
 
 gi <- dlnorm(x = 1:max_gi, 
              meanlog = convert_to_logmean(mean_gi, sigma_gi), 
@@ -41,7 +34,13 @@ sdlog <- convert_to_logsd(mean_gi, sigma_gi)
 # some of these variables and look at the empirical estimates that 
 # result and the inferred estimates we get from applying observation process 
 # degradation
-run_stan_model <- function(n_infectors, alpha_mean, mean_gi, R0, phi_ind_C, phi_C){
+run_stan_model <- function(n_infectors, 
+                           alpha_mean,
+                           mean_gi, 
+                           R0, 
+                           phi_ind_C,
+                           phi_C,
+                           max_gi){
 
     sim_df <- simulate_infector_data(max_gi = max_gi,
                                    mean_gi = mean_gi,
@@ -110,7 +109,8 @@ run_stan_model <- function(n_infectors, alpha_mean, mean_gi, R0, phi_ind_C, phi_
 
 n_infectors <- c(100, 50, 25, 5)
 alpha_mean <- c(0.1, 0.2, 0.4) # Mean number of contacts per person/day (20, 10, 5)
-mean_gi <- 5 #c(2, 4, 14, 21) # What about max gi?
+mean_gi <- 5 #c(2, 4, 14, 21) 
+max_gi <- 28 #c(14, 20, 36, 60) 
 R0 <- 2  #c(2, 4, 8, 16) #2 (flu), 4 (ancestral covid), 8 (omicron), 16 (measles)
 phi_ind_C <- 2 #c(0.1, 2, 20) # Overdispersion in average daily contacts of individuals
 phi_C <- 0.1 #c(0.1, 2, 20) # dispersion in daily contact
@@ -131,6 +131,7 @@ for(i in 1:length(n_infectors)){
             mod <- run_stan_model(n_infectors = n_infectors[i], 
                                 alpha_mean = alpha_mean[j], 
                                 mean_gi = mean_gi[k],
+                                max_gi = max_gi[k],
                                 R0 = R0[l],
                                 phi_ind_C = phi_ind_C[m],
                                 phi_C = phi_C[o])
