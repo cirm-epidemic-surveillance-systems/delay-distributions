@@ -146,7 +146,7 @@ for(i in 1:length(n_infectors)){
 }
 
 
-results <- res |> mutate(true_logmean = meanlog, truelodsd = sdlog) 
+results <- res |> mutate(true_logmean = meanlog, true_sdlog = sdlog) 
 
 
 write.csv(results, file.path("results", "results_all_contacts.csv"))
