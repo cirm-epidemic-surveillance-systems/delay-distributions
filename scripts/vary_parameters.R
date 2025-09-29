@@ -18,17 +18,10 @@ model$compile()
 
 # Set parameter values
 max_gi <- 28
-mean_gi <- 5
 sigma_gi <- 2
-#alpha_mean <- 0.2 # scale factor on GI
 vary_ind_infectiousness <- FALSE
 phi_alpha <- 0.1
-R0 <- 2
-#C_mean <- R0/alpha_mean # Mean number of contacts per day (starting at 10)
-phi_ind_C <- 2
 vary_ind_contact_rate <- FALSE
-phi_C <- 0.1 # dispersion in daily contacts 
-n_infectors <- 100
 
 gi <- dlnorm(x = 1:max_gi, 
              meanlog = convert_to_logmean(mean_gi, sigma_gi), 
@@ -41,9 +34,15 @@ sdlog <- convert_to_logsd(mean_gi, sigma_gi)
 # some of these variables and look at the empirical estimates that 
 # result and the inferred estimates we get from applying observation process 
 # degradation
-run_stan_model <- function(n_infectors, alpha_mean){
-  #C_meam = R0/alpha_mean
-  sim_df <- simulate_infector_data(max_gi = max_gi,
+run_stan_model <- function(n_infectors, 
+                           alpha_mean,
+                           mean_gi, 
+                           R0, 
+                           phi_ind_C,
+                           phi_C,
+                           max_gi){
+
+    sim_df <- simulate_infector_data(max_gi = max_gi,
                                    mean_gi = mean_gi,
                                    alpha_mean = alpha_mean,
                                    vary_ind_infectiousness = vary_ind_infectiousness,
@@ -107,25 +106,51 @@ run_stan_model <- function(n_infectors, alpha_mean){
               logsd_median = fit_binomial$summary("logsd_gi")$median))
 }
 
+
 n_infectors <- c(100, 50, 25, 5)
 alpha_mean <- c(0.1, 0.2, 0.4) # Mean number of contacts per person/day (20, 10, 5)
-res <- data.frame(n_infectors = NA, alpha_mean = NA, logmean_median = NA, logsd_median = NA)
-k <- 0 
+mean_gi <- 5 #c(2, 4, 14, 21) 
+max_gi <- 28 #c(14, 20, 36, 60) 
+R0 <- 2  #c(2, 4, 8, 16) #2 (flu), 4 (ancestral covid), 8 (omicron), 16 (measles)
+phi_ind_C <- 2 #c(0.1, 2, 20) # Overdispersion in average daily contacts of individuals
+phi_C <- 0.1 #c(0.1, 2, 20) # dispersion in daily contact
+
+
+res <- data.frame(n_infectors = NA, alpha_mean = NA, 
+                  mean_gi = NA, R0 = NA,
+                  phi_ind_C = NA, phi_C = NA,
+                  logmean_median = NA, logsd_median = NA)
+n <- 0 
 for(i in 1:length(n_infectors)){
   for(j in 1:length(alpha_mean)){
-    k <- k + 1
-    mod <- run_stan_model(n_infectors = n_infectors[i], alpha_mean = alpha_mean[j])
-    res[k, ] <- c(n_infectors[i], alpha_mean[j], mod$logmean_median, mod$logsd_median)
+    for(k in 1:length(mean_gi)){
+      for(l in 1:length(R0)){
+        for(m in 1:length(phi_ind_C)){
+          for(o in 1:length(phi_C)){
+            n <- n + 1
+            mod <- run_stan_model(n_infectors = n_infectors[i], 
+                                alpha_mean = alpha_mean[j], 
+                                mean_gi = mean_gi[k],
+                                max_gi = max_gi[k],
+                                R0 = R0[l],
+                                phi_ind_C = phi_ind_C[m],
+                                phi_C = phi_C[o])
+            # Save results
+            res[n, ] <- c(n_infectors[i], alpha_mean[j], mean_gi[k], 
+                          R0 = R0[l], phi_ind_C[m], phi_C[o],
+                          mod$logmean_median, mod$logsd_median)
+          }
+        }
+      }
+    }
   }
 }
 
-res %>% mutate(true_logmean = meanlog, truelodsd = sdlog) %>% saveRDS("results/res_tbl")
+
+results <- res |> mutate(true_logmean = meanlog, true_sdlog = sdlog) 
 
 
-
-
-
-
+write.csv(results, file.path("results", "results_all_contacts.csv"))
 
 
 
