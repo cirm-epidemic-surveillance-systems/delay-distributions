@@ -4,8 +4,8 @@ simulate_infector_data <- function(alpha_mean = 0.2, # scale factor on GI
                                    n_infectors = 100,
                                    phi_ind_C =  2,
                                    phi_C =  0.1, # dispersion in daily contacts 
-                                   vary_ind_infectiousness = FALSE,
-                                   vary_ind_contact_rate = FALSE,
+                                   vary_ind_infectiousness = TRUE,
+                                   vary_ind_contact_rate = TRUE,
                                    max_gi = 28,
                                    mean_gi = 5,
                                    sigma_gi = 2){
@@ -15,12 +15,14 @@ simulate_infector_data <- function(alpha_mean = 0.2, # scale factor on GI
                sdlog = convert_to_logsd(mean_gi, sigma_gi))
   
   for(i in 1:n_infectors){
-    # Get the individuals number of contacts per time since infection
+    # Get the individual's average number of contacts per time since infection in 
     if(vary_ind_contact_rate){
       C_i <- rnbinom(n = 1, mu = C_mean, size = phi_ind_C)
     }else{
       C_i <- C_mean # Assume each individual has same mean daily contacts
     }
+    # Variation within in an individual across the GI in number of contacts
+    # per day
     C_i_tau <- rnbinom(n = max_gi, mu = C_i, size = phi_C)
     
     # Intrinsic transmissibility of this infectee (AUC of viral load)
