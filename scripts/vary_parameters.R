@@ -148,7 +148,7 @@ for(i in 1:length(n_infectors)){
 
 
 
-write.csv(results, file.path("results", "results_all_contacts.csv"))
+write.csv(res, file.path("results", "results_all_contacts.csv"))
 
 
 
