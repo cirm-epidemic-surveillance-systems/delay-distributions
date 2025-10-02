@@ -96,6 +96,7 @@ run_stan_models <- function(sim_df,
       name = "gi",
     ) |>
     rename(value = gi) 
+
   return(list(sim_df = sim_df, 
               # Estimates from all contacts (binomial obs model)
               logmean_estimate_binomial = logmean_estimate_binomial, 

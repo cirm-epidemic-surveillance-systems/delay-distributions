@@ -50,7 +50,7 @@ for(i in 1:length(n_infectors)){
   n_infectors_n <- n_infectors[i]
   for(j in 1:length(alpha_mean)){
     alpha_mean_n <- alpha_mean[j]
-    phi_alpha_n <- phi_alpha[j]
+    phi_alpha_n <- phi_alpha
     for(k in 1:length(mean_gi)){
       mean_gi_n <- mean_gi[k]
       max_gi_n <- max_gi[k]
@@ -84,63 +84,67 @@ for(i in 1:length(n_infectors)){
                                              n_infectors = n_infectors_n,
                                              vary_ind_infectiousness = vary_ind_infectiousness,
                                              vary_ind_contact_rate = vary_ind_contact_rate)
-            
-            # Fit both models using the same outbreak data -- one using all contacts
-            # and another using positive only contacts
-            mod <- run_stan_models(
-              sim_df = sim_df,
-              max_gi = max_gi_n)
-            
-            # Save results in a table alongside the metadata 
-            res_n <- data.frame(
-              replicate = p,
-              n_infectors = n_infectors_n, 
-              alpha_mean = alpha_mean_n, 
-              phi_alpha = phi_alpha_n,
-              true_mean_gi = mean_gi_n, 
-              true_logmean_gi = meanlog,
-              true_sdlog_gi = sdlog,
-              R0 = R0_n,
-              phi_ind_C = phi_ind_C_n, 
-              phi_C = phi_C_n,
-              C_bar = C_bar,
-              vary_ind_infectiousness = vary_ind_infectiousness,
-              vary_ind_contact_rate = vary_ind_contact_rate,
-              logmean_median = mod$logmean_median, 
-              logsd_median = mod$logsd_median,
-              logmean_mean = mod$logmean_mean, 
-              logmean_upper_95 = mod$logmean_upper_95,
-              logmean_lower_95 = mod$logmean_lower_95,
-              logmean_median_po = mod$logmean_median_po,
-              logsd_median_po = mod$logsd_median_po,
-              logmean_mean_po = mod$logmean_mean_po,
-              logmean_upper_95_po = mod$logmean_upper_95_po,
-              logmean_lower_95_po = mod$logmean_lower_95_po)
-            
-            # Create a plot that compares true GI to estimated GI from both methods
-            # plot_gi_comparison(gi_true = gi_true,
-            #                    gi_binomial = mod$gi_binomial,
-            #                    gi_po = mod$gi_po,
-            #                    mean_gi = mean_gi_n,
-            #                    n_infectors = n_infectors_n,
-            #                    mean_n_contacts_per_day = C_bar,
-            #                    R0 = R0_n,
-            #                    disp_contacts_day_to_day = phi_C_n,
-            #                    disp_contacts_across_ind = phi_ind_C_n,
-            #                    disp_ind_infectiousness = phi_alpha,
-            #                    output_dir = file.path("results", "figs", "gi_comparisons"))
-            if(n == 1){
-              res <- res_n
-            }else{
-              res <- bind_rows(res, res_n)
-            }
+            #Must have some positive contacts
+            if(nrow(sim_df[sim_df$n_pos_contacts_tau>0, ]) >0){
+              
+              # Fit both models using the same outbreak data -- one using all contacts
+              # and another using positive only contacts
+              mod <- run_stan_models(
+                sim_df = sim_df,
+                max_gi = max_gi_n)
+              
+              # Save results in a table alongside the metadata 
+              res_n <- data.frame(
+                replicate = p,
+                n_infectors = n_infectors_n, 
+                alpha_mean = alpha_mean_n, 
+                phi_alpha = phi_alpha_n,
+                true_mean_gi = mean_gi_n, 
+                true_logmean_gi = meanlog,
+                true_sdlog_gi = sdlog,
+                R0 = R0_n,
+                phi_ind_C = phi_ind_C_n, 
+                phi_C = phi_C_n,
+                C_bar = C_bar,
+                vary_ind_infectiousness = vary_ind_infectiousness,
+                vary_ind_contact_rate = vary_ind_contact_rate,
+                logmean_median = mod$logmean_median, 
+                logsd_median = mod$logsd_median,
+                logmean_mean = mod$logmean_mean, 
+                logmean_upper_95 = mod$logmean_upper_95,
+                logmean_lower_95 = mod$logmean_lower_95,
+                logmean_median_po = mod$logmean_median_po,
+                logsd_median_po = mod$logsd_median_po,
+                logmean_mean_po = mod$logmean_mean_po,
+                logmean_upper_95_po = mod$logmean_upper_95_po,
+                logmean_lower_95_po = mod$logmean_lower_95_po)
+              
+              # Create a plot that compares true GI to estimated GI from both methods
+              # plot_gi_comparison(gi_true = gi_true,
+              #                    gi_binomial = mod$gi_binomial,
+              #                    gi_po = mod$gi_po,
+              #                    mean_gi = mean_gi_n,
+              #                    n_infectors = n_infectors_n,
+              #                    mean_n_contacts_per_day = C_bar,
+              #                    R0 = R0_n,
+              #                    disp_contacts_day_to_day = phi_C_n,
+              #                    disp_contacts_across_ind = phi_ind_C_n,
+              #                    disp_ind_infectiousness = phi_alpha,
+              #                    output_dir = file.path("results", "figs", "gi_comparisons"))
+              if(n == 1){
+                res <- res_n
+              }else{
+                res <- bind_rows(res, res_n)
+              }
             }
           }
         }
       }
     }
   }
+  }
 }
+
 
 
 
