@@ -4,7 +4,7 @@ library(dplyr)
 library(RColorBrewer)
 
 # load output file
-outputs <- read.csv("data/results_all_contacts.csv", 
+outputs <- read.csv("results/results_all_contacts.csv", 
                     stringsAsFactors = FALSE)
 
 # plot results over n_infectors
