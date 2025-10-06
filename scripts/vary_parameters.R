@@ -31,16 +31,16 @@ po_model$compile()
 # Set parameter values we will iterate over
 n_infectors <- c(100, 50, 25, 5)
 n_replicates <- 10
-alpha_mean <- c(0.1, 0.2, 0.4) #P(inf|contact) means that --> Mean number of contacts per person/day (20, 10, 5) = R0/alpha_mean
+alpha_mean <- 0.1 #c(0.1, 0.2, 0.4) #P(inf|contact) means that --> Mean number of contacts per person/day (20, 10, 5) = R0/alpha_mean
 phi_alpha <- 0.1 # Variation in intrinsic infectiousness across individuals 
 vary_ind_infectiousness <- FALSE # Whether individuals vary in their infectiousness
 vary_ind_contact_rate <- FALSE # Whether individuals vary in their average number of contacts
-mean_gi <- c(4, 14, 21) 
-sigma_gi <- c(2, 5, 5)
-max_gi <- c(28, 32, 42) #c(14, 20, 36, 60) 
+mean_gi <- 4 # c(4, 14, 21) 
+sigma_gi <- 2 #c(2, 5, 5)
+max_gi <- 28 # c(28, 32, 42) #c(14, 20, 36, 60) 
 R0 <- 2  #c(2, 4, 8, 16) #2 (flu), 4 (ancestral covid), 8 (omicron), 16 (measles)
 phi_ind_C <- 2 #c(0.1, 2, 20) # Overdispersion in average daily contacts across individuals
-phi_C <- 0.1 #c(0.1, 2, 20) # dispersion in daily contact within an individual across the days since infection 
+phi_C <- c(0.1, 2, 20) # dispersion in daily contact within an individual across the days since infection 
 
 
 
